@@ -8,24 +8,43 @@ namespace NeuralNetwork
 {
     public class NeuralNetwork
     {
-        private int inputnodes;
-        private int hiddennodes;
-        private int outputnodes;
-        private double learningrate;
+        private const int INPUTNODES = 784;
+        private const int HIDDENNODES = 100;
+        private const int OUTPUTNODES = 10;
+        private const double LEARNINGRATE = 0.3;
 
-        Matrix weightInputHidden = new Matrix(0, 0);
-        Matrix weightHiddenOutput = new Matrix(0, 0);
+        private int inputnodes;      // The amount of inputs.
+        private int hiddennodes;     // The amount of nodes in the hidden layer.
+        private int outputnodes;     // The amount of outputs.
+        private double learningrate; // The learning rate.
 
+        Matrix weightInputHidden = new Matrix(0, 0);    // Weights between the input layer and the hidden layer.
+        Matrix weightHiddenOutput = new Matrix(0, 0);   // Weights between the hidden layer and the outputs layer.
+
+        /// <summary>
+        /// Constructor for a general-purpose neural network.
+        /// </summary>
+        /// <param name="inputnodes"> Amount of inputs. </param>
+        /// <param name="hiddennodes"> Amount of nodes in the hidden layer. </param>
+        /// <param name="outputnodes"> Amount of outputs. </param>
+        /// <param name="learningrate"> The learning rate. </param>
         public NeuralNetwork(int inputnodes, int hiddennodes, int outputnodes, double learningrate)
         {
             this.inputnodes = inputnodes;
             this.hiddennodes = hiddennodes;
             this.outputnodes = outputnodes;
             this.learningrate = learningrate;
+
+            // The weights are given random values between [-0.5,0.5] at the beginning.
             weightInputHidden = RandomizeWeights(inputnodes, hiddennodes);
             weightHiddenOutput = RandomizeWeights(hiddennodes, outputnodes);
         }
 
+        /// <summary>
+        /// Query the network for an answer.
+        /// </summary>
+        /// <param name="inputs"> Inputs for the network. </param>
+        /// <returns> The output matrix. </returns>
         public Matrix Query(Matrix inputs)
         {
             // Inputs going into the hidden layer.
@@ -41,6 +60,12 @@ namespace NeuralNetwork
             return final_outputs;
         }
 
+        /// <summary>
+        /// Creates a two-dimensional matrix and fills it with doubles in a [-0.5,0.5] range.
+        /// </summary>
+        /// <param name="r"> Matrix rows </param>
+        /// <param name="c"> Matrix columns </param>
+        /// <returns> Matrix filled with doubles </returns>
         private Matrix RandomizeWeights(int r, int c)
         {
             Random rand = new Random();
@@ -51,6 +76,12 @@ namespace NeuralNetwork
             return temp;
         }
 
+        /// <summary>
+        /// The primary training loop for the network. Updates weights based on the error
+        /// of inputs and the target.
+        /// </summary>
+        /// <param name="inputs"> Inputs for the network. </param>
+        /// <param name="target"> Target for the network. </param>
         public void train(Matrix inputs, Matrix target)
         {
             // Inputs going into the hidden layer.
@@ -68,22 +99,33 @@ namespace NeuralNetwork
             // Errors in the hidden layer.
             Matrix hidden_errors = Matrix.DotProduct(output_errors, weightHiddenOutput.Transpose());
 
+            // Update the weights based on the previous calculations
             UpdateWeights(weightHiddenOutput, output_errors, final_outputs, hidden_outputs);
             UpdateWeights(weightInputHidden, hidden_errors, hidden_outputs, inputs);
         }
 
+        /// <summary>
+        /// Updates the weights using mathemagics.
+        /// </summary>
+        /// <param name="weights"> Weights to be updated. </param>
+        /// <param name="errors"> Severity of errors in the network. </param>
+        /// <param name="first_outputs"> First outputs. </param>
+        /// <param name="second_outputs"> Second outputs. </param>
         private void UpdateWeights(Matrix weights, Matrix errors, Matrix first_outputs, Matrix second_outputs)
         {
-            Matrix temp5 = errors * first_outputs * (1.0 - first_outputs);
-            Matrix temp2 = Matrix.DotProduct(second_outputs.Transpose(), temp5);
+            Matrix mathemagic = Matrix.DotProduct(second_outputs.Transpose(), errors * first_outputs * (1.0 - first_outputs));
             for (int i = 0; i < weights.GetLength(0); i++)
                 for (int j = 0; j < weights.GetLength(1); j++)
-                    weights[i, j] += temp2[i, j] * learningrate;
+                    weights[i, j] += mathemagic[i, j] * learningrate;
         }
 
+        /// <summary>
+        /// Main for testing.
+        /// </summary>
+        /// <param name="args"> Not in use. </param>
         static void Main(string[] args)
         {
-            NeuralNetwork test = new NeuralNetwork(784, 100, 10, 0.3);
+            NeuralNetwork test = new NeuralNetwork(INPUTNODES, HIDDENNODES, OUTPUTNODES, LEARNINGRATE);
             using (var reader = new System.IO.StreamReader(@"mnist_train.csv"))
             {
                 int label;
