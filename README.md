@@ -1,2 +1,2 @@
 # NeuralProject
-A neural network that recognizes letters and numbers.
+A simple neural network.
