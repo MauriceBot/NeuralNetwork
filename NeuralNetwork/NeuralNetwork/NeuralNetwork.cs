@@ -118,9 +118,10 @@ namespace NeuralNetwork
                     weights[i, j] += mathemagic[i, j] * learningrate;
         }
 
-        private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, NeuralNetwork network, EventWaitHandle handle)
+        private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, NeuralNetwork network, EventWaitHandle handle, AutoResetEvent confirmstart)
         {
             Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " starts at index " + start);
+            confirmstart.Set();
             int label;
             for (int i = start; i < start + slice; i++)
             {
@@ -158,6 +159,7 @@ namespace NeuralNetwork
             object baton = new object();
             NeuralNetwork test = new NeuralNetwork(INPUTNODES, HIDDENNODES, OUTPUTNODES, LEARNINGRATE);
             WaitHandle[] waitHandles = new WaitHandle[Environment.ProcessorCount];
+            AutoResetEvent autoEvent = new AutoResetEvent(false);
             System.Collections.Generic.List<String> temp = new System.Collections.Generic.List<string>(60000);
             using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_train.csv"))
             {
@@ -166,16 +168,15 @@ namespace NeuralNetwork
                     temp.Add(reader.ReadLine());
                 }
             }
-
-            int processors = Environment.ProcessorCount;
-            int slice = temp.Count / processors;
-            for (int i = 0, j = 0; i < processors; i++, j += slice)
+            int slice = temp.Count / Environment.ProcessorCount;
+            for (int i = 0, j = 0; i < Environment.ProcessorCount; i++, j += slice)
             {
                 EventWaitHandle handle = new EventWaitHandle(false,EventResetMode.ManualReset);
-                Thread newThread = new Thread(() => test.Trainloop(j, slice, temp, test, handle));
+                Thread newThread = new Thread(() => test.Trainloop(j, slice, temp, test, handle, autoEvent));
                 waitHandles[i] = handle;
                 newThread.Start();
-                Thread.Sleep(1000);
+                autoEvent.WaitOne();
+                autoEvent.Reset();
             }
             WaitHandle.WaitAll(waitHandles);
             
