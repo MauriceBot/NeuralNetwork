@@ -67,7 +67,7 @@ namespace NeuralNetwork
 
         }
 
-        public static Matrix DotProduct(Matrix a, Matrix b)
+        public static Matrix DotProduct(Matrix a, Matrix b) // Mutltithread this?
         {
 
             Matrix c = new Matrix(a.m_matrix.GetLength(0), b.m_matrix.GetLength(1));
