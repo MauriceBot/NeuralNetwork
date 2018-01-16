@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace NeuralNetwork
 {
@@ -119,6 +116,31 @@ namespace NeuralNetwork
                     weights[i, j] += mathemagic[i, j] * learningrate;
         }
 
+        private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, NeuralNetwork network)
+        {
+            int label;
+            for(int i = start; i < slice; i++)
+            {
+                string line = data[i];
+                string[] values = line.Split(',');
+                Matrix inputs = new Matrix(1, 784);
+
+                label = int.Parse(values[0]);
+                for (int j = 1; j < values.Length - 1; j++)
+                {
+                    inputs[0, j] = (int.Parse(values[j]) / 255.0 * 0.99) + 0.01;
+                }
+                Matrix targets = new Matrix(1, 10);
+                for (int k = 0; k < targets.GetLength(1); k++)
+                {
+                    targets[0, k] = 0.01;
+                }
+                targets[0, label] = 0.99;
+
+                network.train(inputs, targets);
+            }
+        }
+
         /// <summary>
         /// Main for testing.
         /// </summary>
@@ -126,14 +148,37 @@ namespace NeuralNetwork
         static void Main(string[] args)
         {
             NeuralNetwork test = new NeuralNetwork(INPUTNODES, HIDDENNODES, OUTPUTNODES, LEARNINGRATE);
-            using (var reader = new System.IO.StreamReader(@"mnist_train.csv"))
+            System.Collections.Generic.List<String> temp = new System.Collections.Generic.List<string>(60000);
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_train.csv"))
             {
+                while (!reader.EndOfStream)
+                {
+                    temp.Add(reader.ReadLine());
+                }
+            }
+            
+            int processors = Environment.ProcessorCount;
+            int slice = temp.Count / processors;
+            for (int i = 0; i < processors; i++) // wad dis new phoneasdasd
+            {
+                for (int j = 0; j < temp.Count; j+= slice)
+                {
+                    new Thread(() => test.Trainloop(j,slice,temp, test)).Start();
+                }
+            }
+            Thread.Sleep(100000);
+
+
+           /* using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_train.csv"))
+            {
+                
+                
+
                 int label;
                 while (!reader.EndOfStream)
                 {
-
-                    var line = reader.ReadLine();
-                    var values = line.Split(',');
+                    string line = reader.ReadLine();
+                    string[] values = line.Split(',');
                     Matrix inputs = new Matrix(1, 784);
 
                     label = int.Parse(values[0]);
@@ -152,11 +197,11 @@ namespace NeuralNetwork
                 }
             }
 
-            using (var reader = new System.IO.StreamReader(@"mnist_test.csv"))
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_test.csv"))
             {
                 int label;
-                var line = reader.ReadLine();
-                var values = line.Split(',');
+                string line = reader.ReadLine();
+                string[] values = line.Split(',');
                 Matrix inputs = new Matrix(1, 784);
 
                 label = int.Parse(values[0]);
@@ -166,7 +211,7 @@ namespace NeuralNetwork
                 }
 
                 Matrix trueresults = test.Query(inputs);
-            }
+            }*/
         }
     }
 }
