@@ -81,6 +81,8 @@ namespace NeuralNetwork
         /// <param name="target"> Target for the network. </param>
         public void train(Matrix inputs, Matrix target)
         {
+
+            Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " is training...");
             // Inputs going into the hidden layer.
             Matrix hidden_inputs = Matrix.DotProduct(inputs, weightInputHidden);
             // Inputs leaving the hidden layer sigmoided.
@@ -118,9 +120,11 @@ namespace NeuralNetwork
 
         private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, NeuralNetwork network)
         {
+            Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " is born!");
             int label;
-            for(int i = start; i < slice; i++)
+            for (int i = start; i < start+slice-1; i++)
             {
+                Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " is advancing!");
                 string line = data[i];
                 string[] values = line.Split(',');
                 Matrix inputs = new Matrix(1, 784);
@@ -135,6 +139,7 @@ namespace NeuralNetwork
                 {
                     targets[0, k] = 0.01;
                 }
+                
                 targets[0, label] = 0.99;
 
                 network.train(inputs, targets);
@@ -159,14 +164,12 @@ namespace NeuralNetwork
             
             int processors = Environment.ProcessorCount;
             int slice = temp.Count / processors;
-            for (int i = 0; i < processors; i++) // wad dis new phoneasdasd
+            for (int i = 0, j = 0; i < processors-1; i++, j+=slice) 
             {
-                for (int j = 0; j < temp.Count; j+= slice)
-                {
-                    new Thread(() => test.Trainloop(j,slice,temp, test)).Start();
-                }
+                Thread newThread = new Thread(() => test.Trainloop(j, slice, temp, test));
+                newThread.Start();
             }
-            Thread.Sleep(100000);
+            
 
 
            /* using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_train.csv"))
