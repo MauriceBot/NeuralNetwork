@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 
 namespace NeuralNetwork
@@ -9,6 +11,7 @@ namespace NeuralNetwork
         private const int HIDDENNODES = 100;
         private const int OUTPUTNODES = 10;
         private const double LEARNINGRATE = 0.3;
+        private const int DATALENGTH = 60000;
 
         private int inputnodes;      // The amount of inputs.
         private int hiddennodes;     // The amount of nodes in the hidden layer.
@@ -81,8 +84,6 @@ namespace NeuralNetwork
         /// <param name="target"> Target for the network. </param>
         public void train(Matrix inputs, Matrix target)
         {
-
-            Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " is training...");
             // Inputs going into the hidden layer.
             Matrix hidden_inputs = Matrix.DotProduct(inputs, weightInputHidden);
             // Inputs leaving the hidden layer sigmoided.
@@ -112,20 +113,19 @@ namespace NeuralNetwork
         /// <param name="second_outputs"> Second outputs. </param>
         private void UpdateWeights(Matrix weights, Matrix errors, Matrix first_outputs, Matrix second_outputs)
         {
-            Matrix mathemagic = Matrix.DotProduct(second_outputs.Transpose(), errors * first_outputs * (1.0 - first_outputs));
+            Matrix updateMatrix = Matrix.DotProduct(second_outputs.Transpose(), errors * first_outputs * (1.0 - first_outputs));
             for (int i = 0; i < weights.GetLength(0); i++)
                 for (int j = 0; j < weights.GetLength(1); j++)
-                    weights[i, j] += mathemagic[i, j] * learningrate;
+                    weights[i, j] += updateMatrix[i, j] * learningrate;
         }
 
-        private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, NeuralNetwork network, EventWaitHandle handle, AutoResetEvent confirmstart)
+        private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, EventWaitHandle handle, AutoResetEvent confirmstart)
         {
             Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " starts at index " + start);
             confirmstart.Set();
             int label;
             for (int i = start; i < start + slice; i++)
             {
-                Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " is advancing!");
                 string line = data[i];
                 string[] values = line.Split(',');
                 Matrix inputs = new Matrix(1, 784);
@@ -143,7 +143,7 @@ namespace NeuralNetwork
 
                 targets[0, label] = 0.99;
 
-                network.train(inputs, targets);
+                train(inputs, targets);
             }
             handle.Set();
         }
@@ -156,76 +156,56 @@ namespace NeuralNetwork
         /// <param name="args"> Not in use. </param>
         static void Main(string[] args)
         {
-            object baton = new object();
-            NeuralNetwork test = new NeuralNetwork(INPUTNODES, HIDDENNODES, OUTPUTNODES, LEARNINGRATE);
-            WaitHandle[] waitHandles = new WaitHandle[Environment.ProcessorCount];
-            AutoResetEvent autoEvent = new AutoResetEvent(false);
-            System.Collections.Generic.List<String> temp = new System.Collections.Generic.List<string>(60000);
-            using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_train.csv"))
-            {
+            NeuralNetwork network = new NeuralNetwork(INPUTNODES, HIDDENNODES, OUTPUTNODES, LEARNINGRATE);
+
+            List<String> datalist = new List<string>(DATALENGTH); // Forgive my sins
+            using (StreamReader reader = new StreamReader(@"mnist_train.csv"))
                 while (!reader.EndOfStream)
-                {
-                    temp.Add(reader.ReadLine());
-                }
-            }
-            int slice = temp.Count / Environment.ProcessorCount;
-            for (int i = 0, j = 0; i < Environment.ProcessorCount; i++, j += slice)
+                    datalist.Add(reader.ReadLine());
+
+            /**************
+             TRAINING LOOP
+             **************/
+            int processors = Environment.ProcessorCount;
+            WaitHandle[] waitHandles = new WaitHandle[processors];
+            AutoResetEvent autoEvent = new AutoResetEvent(false);
+            int slice = datalist.Count / processors;
+            for (int i = 0, j = 0; i < processors; i++, j += slice)
             {
                 EventWaitHandle handle = new EventWaitHandle(false,EventResetMode.ManualReset);
-                Thread newThread = new Thread(() => test.Trainloop(j, slice, temp, test, handle, autoEvent));
+                Thread newThread = new Thread(() => network.Trainloop(j, slice, datalist, handle, autoEvent));
                 waitHandles[i] = handle;
                 newThread.Start();
-                autoEvent.WaitOne();
-                autoEvent.Reset();
+
+                autoEvent.WaitOne(); autoEvent.Reset(); // Syncing
             }
-            WaitHandle.WaitAll(waitHandles);
-            
+            WaitHandle.WaitAll(waitHandles); // Further syncing
 
 
-            /* using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_train.csv"))
-             {
-
-
-
-                 int label;
-                 while (!reader.EndOfStream)
-                 {
-                     string line = reader.ReadLine();
-                     string[] values = line.Split(',');
-                     Matrix inputs = new Matrix(1, 784);
-
-                     label = int.Parse(values[0]);
-                     for (int i = 1; i < values.Length - 1; i++)
-                     {
-                         inputs[0, i] = (int.Parse(values[i]) / 255.0 * 0.99) + 0.01;
-                     }
-                     Matrix targets = new Matrix(1, 10);
-                     for (int i = 0; i < targets.GetLength(1); i++)
-                     {
-                         targets[0, i] = 0.01;
-                     }
-                     targets[0, label] = 0.99;
-
-                     test.train(inputs, targets);
-                 }
-             }
-             */
+            /**************
+              TESTING LOOP
+             **************/
+            int correct = 0;
             using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_test.csv"))
             {
-                int label;
-                string line = reader.ReadLine();
-                string[] values = line.Split(',');
-                Matrix inputs = new Matrix(1, 784);
+                while (!reader.EndOfStream) { 
+                    int label;
+                    string line = reader.ReadLine();
+                    string[] values = line.Split(',');
+                    Matrix inputs = new Matrix(1, 784);
 
-                label = int.Parse(values[0]);
-                for (int i = 1; i < values.Length - 1; i++)
-                {
-                    inputs[0, i] = (int.Parse(values[i]) / 255.0 * 0.99) + 0.01;
+                    label = int.Parse(values[0]);
+                    for (int i = 1; i < values.Length - 1; i++)
+                    {
+                        inputs[0, i] = (int.Parse(values[i]) / 255.0 * 0.99) + 0.01;
+                    }
+
+                    Matrix trueresults = network.Query(inputs);
+                    if (trueresults[0,label] > 0.5)
+                        correct++;
                 }
-
-                Matrix trueresults = test.Query(inputs);
-
             }
+            Console.WriteLine("{0}% success rate!",(correct/100)); //RECENT: 94%
         }
     }
 }
