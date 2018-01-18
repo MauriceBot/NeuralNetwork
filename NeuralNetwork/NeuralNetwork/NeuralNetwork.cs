@@ -10,8 +10,9 @@ namespace NeuralNetwork
         private const int INPUTNODES = 784;
         private const int HIDDENNODES = 100;
         private const int OUTPUTNODES = 10;
-        private const double LEARNINGRATE = 0.3;
+        private const double LEARNINGRATE = 0.2;
         private const int DATALENGTH = 60000;
+        private const int EPOCHS = 2;
 
         private int inputnodes;      // The amount of inputs.
         private int hiddennodes;     // The amount of nodes in the hidden layer.
@@ -170,17 +171,19 @@ namespace NeuralNetwork
             WaitHandle[] waitHandles = new WaitHandle[processors];
             AutoResetEvent autoEvent = new AutoResetEvent(false);
             int slice = datalist.Count / processors;
-            for (int i = 0, j = 0; i < processors; i++, j += slice)
+            for (int e = 0; e < EPOCHS; e++)
             {
-                EventWaitHandle handle = new EventWaitHandle(false,EventResetMode.ManualReset);
-                Thread newThread = new Thread(() => network.Trainloop(j, slice, datalist, handle, autoEvent));
-                waitHandles[i] = handle;
-                newThread.Start();
+                for (int i = 0, j = 0; i < processors; i++, j += slice)
+                {
+                    EventWaitHandle handle = new EventWaitHandle(false,EventResetMode.ManualReset);
+                    Thread newThread = new Thread(() => network.Trainloop(j, slice, datalist, handle, autoEvent));
+                    waitHandles[i] = handle;
+                    newThread.Start();
 
-                autoEvent.WaitOne(); autoEvent.Reset(); // Syncing
+                    autoEvent.WaitOne(); autoEvent.Reset(); // Syncing
+                }
+                WaitHandle.WaitAll(waitHandles); // Further syncing
             }
-            WaitHandle.WaitAll(waitHandles); // Further syncing
-
 
             /**************
               TESTING LOOP
@@ -205,7 +208,8 @@ namespace NeuralNetwork
                         correct++;
                 }
             }
-            Console.WriteLine("{0}% success rate!",(correct/100)); //RECENT: 94%
+            Console.WriteLine("{0}% success rate!",(correct/100)); //92%, LR: 0.3, E: 1  --- 93%, LR: 0.2, E: 1
+            Console.ReadKey();                                     //89%, LR: 0.6, E: 1  --- 94%, LR: 0.2, E: 2
         }
     }
 }
