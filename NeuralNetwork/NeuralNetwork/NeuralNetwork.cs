@@ -120,10 +120,18 @@ namespace NeuralNetwork
                     weights[i, j] += updateMatrix[i, j] * learningrate;
         }
 
-        private void Trainloop(int start, int slice, System.Collections.Generic.List<String> data, EventWaitHandle handle, AutoResetEvent confirmstart)
+        /// <summary>
+        /// Main training loop.
+        /// </summary>
+        /// <param name="start">Where does the thread start in the data array?</param>
+        /// <param name="slice">How far does te thread go into the array?</param>
+        /// <param name="data">The main data list</param>
+        /// <param name="confirmFinish">Confirm that the thread has finished</param>
+        /// <param name="confirmStart">Confirm that the thread has started</param>
+        private void Trainloop(int start, int slice, List<String> data, EventWaitHandle confirmFinish, AutoResetEvent confirmStart)
         {
             Console.WriteLine(Thread.CurrentThread.ManagedThreadId + " starts at index " + start);
-            confirmstart.Set();
+            confirmStart.Set();
             int label;
             for (int i = start; i < start + slice; i++)
             {
@@ -133,23 +141,17 @@ namespace NeuralNetwork
 
                 label = int.Parse(values[0]);
                 for (int j = 1; j < values.Length - 1; j++)
-                {
                     inputs[0, j] = (int.Parse(values[j]) / 255.0 * 0.99) + 0.01;
-                }
                 Matrix targets = new Matrix(1, 10);
                 for (int k = 0; k < targets.GetLength(1); k++)
-                {
                     targets[0, k] = 0.01;
-                }
 
                 targets[0, label] = 0.99;
 
                 train(inputs, targets);
             }
-            handle.Set();
+            confirmFinish.Set();
         }
-
-
         
         /// <summary>
         /// Main for testing.
@@ -169,18 +171,18 @@ namespace NeuralNetwork
              **************/
             int processors = Environment.ProcessorCount;
             WaitHandle[] waitHandles = new WaitHandle[processors];
-            AutoResetEvent autoEvent = new AutoResetEvent(false);
+            AutoResetEvent finisher = new AutoResetEvent(false);
             int slice = datalist.Count / processors;
             for (int e = 0; e < EPOCHS; e++)
             {
                 for (int i = 0, j = 0; i < processors; i++, j += slice)
                 {
-                    EventWaitHandle handle = new EventWaitHandle(false,EventResetMode.ManualReset);
-                    Thread newThread = new Thread(() => network.Trainloop(j, slice, datalist, handle, autoEvent));
-                    waitHandles[i] = handle;
+                    EventWaitHandle starter = new EventWaitHandle(false,EventResetMode.ManualReset);
+                    Thread newThread = new Thread(() => network.Trainloop(j, slice, datalist, starter, finisher));
+                    waitHandles[i] = starter;
                     newThread.Start();
 
-                    autoEvent.WaitOne(); autoEvent.Reset(); // Syncing
+                    finisher.WaitOne(); finisher.Reset(); // Syncing
                 }
                 WaitHandle.WaitAll(waitHandles); // Further syncing
             }
@@ -189,7 +191,7 @@ namespace NeuralNetwork
               TESTING LOOP
              **************/
             int correct = 0;
-            using (System.IO.StreamReader reader = new System.IO.StreamReader(@"mnist_test.csv"))
+            using (StreamReader reader = new StreamReader(@"mnist_test.csv"))
             {
                 while (!reader.EndOfStream) { 
                     int label;
@@ -199,9 +201,7 @@ namespace NeuralNetwork
 
                     label = int.Parse(values[0]);
                     for (int i = 1; i < values.Length - 1; i++)
-                    {
                         inputs[0, i] = (int.Parse(values[i]) / 255.0 * 0.99) + 0.01;
-                    }
 
                     Matrix trueresults = network.Query(inputs);
                     if (trueresults[0,label] > 0.5)

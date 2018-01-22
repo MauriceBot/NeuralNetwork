@@ -97,7 +97,7 @@ namespace NeuralNetwork
             return result;
         }
 
-        public Matrix Sigmoid()
+        public Matrix Sigmoid() // Bad as an activation function?
         {
             int w = m_matrix.GetLength(0);
             int h = m_matrix.GetLength(1);
